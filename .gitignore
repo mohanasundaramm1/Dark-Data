@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.venv/
+rag_pipeline_env/
+output/
+archive/
