@@ -40,7 +40,7 @@ def run_pipeline():
 
     # 3. Embedding
     logger.info("Phase 3: Vector Embedding")
-    embedder = get_embedder("mock")
+    embedder = get_embedder(settings.EMBEDDING_TYPE)
     # Extract text content for embedding
     texts = [c.content for c in chunks]
     embeddings = embedder.embed_documents(texts)

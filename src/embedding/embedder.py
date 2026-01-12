@@ -31,7 +31,31 @@ class MockEmbedder(BaseEmbedder):
             embeddings.append(vector)
         return embeddings
 
-def get_embedder(type: str = "mock") -> BaseEmbedder:
+class HuggingFaceEmbedder(BaseEmbedder):
+    """
+    A real local embedder using sentence-transformers.
+    Downloads the model once and runs locally.
+    """
+    def __init__(self, model_name: str = settings.EMBEDDING_MODEL_NAME):
+        try:
+            from sentence_transformers import SentenceTransformer
+            logger.info(f"Loading local embedding model: {model_name}...")
+            self.model = SentenceTransformer(model_name)
+            logger.info("Model loaded successfully.")
+        except ImportError:
+            logger.error("sentence-transformers not installed. Please run: pip install sentence-transformers")
+            raise
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        logger.info(f"Generating semantic vectors for {len(texts)} chunks using HuggingFace.")
+        # encode returns numpy array, convert to list
+        embeddings = self.model.encode(texts, show_progress_bar=True)
+        return embeddings.tolist()
+
+def get_embedder(type: str = settings.EMBEDDING_TYPE) -> BaseEmbedder:
     if type == "mock":
         return MockEmbedder()
-    raise ValueError(f"Unknown embedder type: {type}")
+    elif type == "huggingface":
+        return HuggingFaceEmbedder()
+    else:
+        raise ValueError(f"Unknown embedder type: {type}")
