@@ -60,7 +60,19 @@ Run the full ingestion pipeline. This process will:
 make run
 ```
 
-### 3. Verify Business Value (Demo)
+
+### 3. Configuration (Optional)
+This pipeline supports both **Local** (Real) and **Mock** (Fast/Test) embedding modes.
+Edit the `.env` file to configure:
+
+```bash
+# Use 'huggingface' for real AI (downloads ~400MB model)
+# Use 'mock' for instant testing (random vectors)
+EMBEDDING_TYPE=huggingface
+EMBEDDING_MODEL_NAME=all-mpnet-base-v2
+```
+
+### 4. Verify Business Value (Demo)
 Inspect the structured output that was generated. This proves the data is now ready for consumption by Vector DBs or LLMs.
 ```bash
 make demo
