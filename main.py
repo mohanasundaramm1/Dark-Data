@@ -5,7 +5,7 @@ import time
 
 from src.config.settings import settings
 from src.ingestion.loader import PDFLoader
-from src.processing.text_splitter import TextChunker
+from src.processing.factory import StrategyFactory
 from src.embedding.embedder import get_embedder
 from src.storage.manager import VectorStorageManager
 
@@ -32,10 +32,13 @@ def run_pipeline():
         logger.error("No documents found. Exiting.")
         return
 
-    # 2. Processing (Chunking)
-    logger.info("Phase 2: Processing (Chunking)")
-    chunker = TextChunker()
+    # 2. Processing (Chunking) Strategy Pattern
+    logger.info(f"Phase 2: Processing (Chunking) using {settings.CHUNKING_STRATEGY} strategy")
+    
+    # Instantiate the correct strategy via Factory
+    chunker = StrategyFactory.get_strategy(settings.CHUNKING_STRATEGY)
     chunks = chunker.split(documents)
+    
     logger.info(f"Generated {len(chunks)} total chunks from {len(documents)} documents.")
 
     # 3. Embedding

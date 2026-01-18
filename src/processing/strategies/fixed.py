@@ -1,14 +1,14 @@
 from typing import List
-from src.ingestion.models import IngestedDocument, ProcessedChunk
-from src.config.settings import settings
 import logging
+from src.ingestion.models import IngestedDocument, ProcessedChunk
+from src.processing.strategies.base import ChunkingStrategy
+from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-class TextChunker:
+class FixedSizeStrategy(ChunkingStrategy):
     """
-    Custom implementation of credential-aware text chunking.
-    Splits text into chunks of a specified size with overlap.
+    Splits text into chunks of a specified fixed character size with overlap.
     """
     def __init__(self, chunk_size: int = settings.CHUNK_SIZE, overlap: int = settings.CHUNK_OVERLAP):
         self.chunk_size = chunk_size
@@ -16,7 +16,7 @@ class TextChunker:
 
     def split(self, documents: List[IngestedDocument]) -> List[ProcessedChunk]:
         all_chunks = []
-        logger.info(f"Starting chunking process. Strategy: Fixed Size ({self.chunk_size}) with Overlap ({self.overlap})")
+        logger.info(f"Using FixedSizeStrategy: Size={self.chunk_size}, Overlap={self.overlap}")
 
         for doc in documents:
             chunks = self._chunk_text(doc.content)
@@ -33,7 +33,6 @@ class TextChunker:
         return all_chunks
 
     def _chunk_text(self, text: str) -> List[str]:
-        """Simple sliding window chunking."""
         if not text:
             return []
         
@@ -46,11 +45,9 @@ class TextChunker:
             chunk = text[start:end]
             chunks.append(chunk)
             
-            # If we reached the end, break
             if end >= text_len:
                 break
                 
-            # Move start pointer forward, accounting for overlap
             start += (self.chunk_size - self.overlap)
         
         return chunks

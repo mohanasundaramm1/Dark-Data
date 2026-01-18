@@ -27,6 +27,10 @@ graph LR
 
 ### Key Engineering Features
 - **Modular Design**: Decoupled Ingestion, Processing, and Storage layers.
+- **Advanced Chunking**: Strategy Pattern implementation supporting:
+    - `structural`: Intelligent recursive splitting for PDFs (headers/paragraphs).
+    - `sliding`: Word-based sliding window for Audio/Transcripts.
+    - `fixed`: Standard fixed-size character splitting.
 - **Data Quality**: Enforced via `Pydantic` schemas to ensure no bad data moves downstream.
 - **Observability**: Detailed logging for every stage of the pipeline.
 - **Scalability**: Stateless architecture that can be deployed on Airflow or Kubernetes.
@@ -70,6 +74,10 @@ Edit the `.env` file to configure:
 # Use 'mock' for instant testing (random vectors)
 EMBEDDING_TYPE=huggingface
 EMBEDDING_MODEL_NAME=all-mpnet-base-v2
+
+# CHUNKING STRATEGY
+# 'structural' (Best for PDFs) | 'sliding' (Best for Audio) | 'fixed' (Fastest)
+CHUNKING_STRATEGY=structural
 ```
 
 ### 4. Verify Business Value (Demo)

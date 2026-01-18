@@ -16,6 +16,10 @@ class Settings:
     # Model name for HuggingFace (e.g., "all-mpnet-base-v2")
     EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "all-mpnet-base-v2")
     
+    # Chunking Configuration
+    # Options: "fixed", "sliding", "structural"
+    CHUNKING_STRATEGY = os.getenv("CHUNKING_STRATEGY", "structural")
+
     # Path where processed parquet files (silver layer) will be saved
     OUTPUT_PATH = os.path.join("output", "embeddings.parquet")
 
