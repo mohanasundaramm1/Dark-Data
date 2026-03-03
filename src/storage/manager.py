@@ -14,6 +14,65 @@ class BaseStorageManager(ABC):
         """Saves chunks and embeddings to the underlying storage system."""
         pass
 
+    def validate_data_quality(self, chunks: List[ProcessedChunk], embeddings: List[Any]):
+        import great_expectations as gx
+        
+        logger.info("Running Great Expectations Data Quality Checks...")
+        
+        data = []
+        for chunk, vector_data in zip(chunks, embeddings):
+            row = {
+                "chunk_id": chunk.chunk_id,
+                "parent_id": chunk.parent_doc_id,
+                "text": chunk.content,
+            }
+            if isinstance(vector_data, dict) and "dense" in vector_data:
+                row["vector_len"] = len(vector_data["dense"])
+            elif isinstance(vector_data, list):
+                row["vector_len"] = len(vector_data)
+            else:
+                row["vector_len"] = 0
+            data.append(row)
+            
+        df = pd.DataFrame(data)
+        context = gx.get_context(mode="ephemeral")
+        
+        # Connect to data
+        data_source = context.data_sources.add_pandas("memory_data")
+        data_asset = data_source.add_dataframe_asset("chunks_asset")
+        batch_def = data_asset.add_batch_definition_whole_dataframe("my_batch_def")
+        
+        # Create an Expectation Suite
+        suite = context.suites.add(gx.ExpectationSuite(name="pipeline_checks"))
+        
+        # 1. Content must not be null
+        suite.add_expectation(
+            gx.expectations.ExpectColumnValuesToNotBeNull(column="text")
+        )
+        # 2. Vector must be length 768
+        suite.add_expectation(
+            gx.expectations.ExpectColumnValuesToBeBetween(
+                column="vector_len", min_value=768, max_value=768
+            )
+        )
+        # 3. ID format
+        suite.add_expectation(
+            gx.expectations.ExpectColumnValuesToNotBeNull(column="chunk_id")
+        )
+
+        validation_result = context.validation_definitions.add(
+            gx.ValidationDefinition(
+                name="pipeline_validation",
+                data=batch_def,
+                suite=suite
+            )
+        ).run(batch_parameters={"dataframe": df})
+        
+        if not validation_result.success:
+            logger.error("Data Quality Data Contract FAILED!")
+            raise Exception(f"Data Quality Assertions Failed: {validation_result}")
+        logger.info("Data Quality Rules Passed Successfully!")
+
 class ParquetStorageManager(BaseStorageManager):
     """Saves vectorized chunks to a Parquet file (Data Lake / Silver Layer)."""
     def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[Any]):
@@ -21,6 +80,8 @@ class ParquetStorageManager(BaseStorageManager):
             logger.warning("No chunks to save.")
             return
 
+        self.validate_data_quality(chunks, embeddings)
+        
         logger.info(f"Preparing to save {len(chunks)} vectors to Parquet Storage.")
         
         data = []
@@ -84,6 +145,8 @@ class QdrantStorageManager(BaseStorageManager):
         if not chunks:
             logger.warning("No chunks to save.")
             return
+
+        self.validate_data_quality(chunks, embeddings)
 
         from qdrant_client.models import PointStruct, SparseVector
 

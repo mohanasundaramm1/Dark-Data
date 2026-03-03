@@ -17,3 +17,7 @@ uvicorn[standard]>=0.30.0
 streamlit>=1.30.0
 requests>=2.31.0
 fastembed
+
+pytesseract
+pdf2image
+great_expectations>=0.18.0

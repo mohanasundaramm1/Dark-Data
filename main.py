@@ -4,7 +4,7 @@ import sys
 import time
 
 from src.config.settings import settings
-from src.ingestion.loader import PDFLoader
+from src.ingestion.multimodal_loader import MultimodalLoader
 from src.processing.factory import StrategyFactory
 from src.embedding.embedder import get_embedder
 from src.storage.manager import get_storage_manager
@@ -26,7 +26,7 @@ def run_pipeline():
     
     # 1. Ingestion
     logger.info("Phase 1: Ingestion")
-    loader = PDFLoader(settings.DATA_DIR)
+    loader = MultimodalLoader(settings.DATA_DIR)
     documents = loader.load_documents()
     if not documents:
         logger.error("No documents found. Exiting.")

@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import pipeline functions
 from src.config.settings import settings
-from src.ingestion.loader import PDFLoader
+from src.ingestion.multimodal_loader import MultimodalLoader
 from src.processing.factory import StrategyFactory
 from src.embedding.embedder import get_embedder
 from src.storage.manager import get_storage_manager
@@ -37,7 +37,7 @@ with DAG(
 
     def load_documents(**context):
         print(f"Loading documents from: {settings.DATA_DIR}")
-        loader = PDFLoader(settings.DATA_DIR)
+        loader = MultimodalLoader(settings.DATA_DIR)
         documents = loader.load_documents()
         if not documents:
             raise ValueError("No documents found. Failing pipeline.")
@@ -49,7 +49,7 @@ with DAG(
 
     def process_and_store(**context):
         # 1. Ingestion
-        loader = PDFLoader(settings.DATA_DIR)
+        loader = MultimodalLoader(settings.DATA_DIR)
         documents = loader.load_documents()
 
         # 2. Chunking
