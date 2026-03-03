@@ -27,6 +27,13 @@ infra-up:
 
 infra-down:
 	docker-compose down
+
+eval:
+	PYTHONPATH=. rag_pipeline_env/bin/python src/evaluation/retrieval_eval.py
+
+lint:
+	rag_pipeline_env/bin/ruff check .
+	rag_pipeline_env/bin/mypy src/ --ignore-missing-imports
 clean:
 	rm -rf output
 	find . -type d -name "__pycache__" -exec rm -rf {} +

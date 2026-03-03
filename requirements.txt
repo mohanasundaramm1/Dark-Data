@@ -29,3 +29,5 @@ pytest
 tenacity
 ruff
 mypy
+slowapi
+prometheus-fastapi-instrumentator
