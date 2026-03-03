@@ -11,6 +11,13 @@ class FixedSizeStrategy(ChunkingStrategy):
     Splits text into chunks of a specified fixed character size with overlap.
     """
     def __init__(self, chunk_size: int = settings.CHUNK_SIZE, overlap: int = settings.CHUNK_OVERLAP):
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be greater than 0")
+        if overlap >= chunk_size:
+            raise ValueError("overlap must be strictly less than chunk_size to avoid infinite loops")
+        if overlap < 0:
+            raise ValueError("overlap must be non-negative")
+            
         self.chunk_size = chunk_size
         self.overlap = overlap
 

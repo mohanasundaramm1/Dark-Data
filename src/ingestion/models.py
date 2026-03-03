@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 class IngestedDocument(BaseModel):
@@ -9,7 +9,7 @@ class IngestedDocument(BaseModel):
     filename: str
     content: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    ingested_at: datetime = Field(default_factory=datetime.utcnow)
+    ingested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ProcessedChunk(BaseModel):
     """Represents a chunk of text that has been processed and is ready for embedding."""

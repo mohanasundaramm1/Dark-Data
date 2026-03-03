@@ -39,12 +39,13 @@ graph LR
 
 ## 🛠 Tech Stack
 - **Language**: Python 3.10+
-- **Data Validation**: Pydantic
-- **Processing**: LangChain / Pandas 2.0
-- **Storage**: Qdrant Vector DB (Serving Layer) & Apache Parquet (Data Lake)
+- **Data Validation**: Pydantic & Great Expectations (Data Contracts)
+- **Processing**: LangChain, PyPDF, Tesseract (OCR)
+- **Storage**: Qdrant Vector DB (Hybrid Dense+Sparse Search) & Apache Parquet
 - **Orchestration**: Apache Airflow
+- **Streaming**: Redpanda (Kafka compatible) publish-subscribe
 - **API/Serving**: FastAPI
-- **Infrastructure**: Docker / Make / VirtualEnv
+- **Infrastructure**: Terraform, Docker, Make, Pytest
 
 ---
 
@@ -82,25 +83,26 @@ make ui
 ```
 
 
-### 3. Configuration (Optional)
-This pipeline supports both **Local** (Real) and **Mock** (Fast/Test) embedding modes.
+### 6. Configuration & Offline Mode
+This pipeline supports both **Local** (Offline) and **Online** embedding modes.
 Edit the `.env` file to configure:
 
 ```bash
-# Use 'huggingface' for real AI (downloads ~400MB model)
-# Use 'mock' for instant testing (random vectors)
-EMBEDDING_TYPE=huggingface
+# `hybrid` (Best for Qdrant RAG) | `huggingface` (Dense only) | `mock` (Offline testing limits downloads)
+EMBEDDING_TYPE=hybrid
+# Model name config (Will download weights on first startup ~400MB if using Huggingface/Hybrid)
 EMBEDDING_MODEL_NAME=all-mpnet-base-v2
-
 # CHUNKING STRATEGY
-# 'structural' (Best for PDFs) | 'sliding' (Best for Audio) | 'fixed' (Fastest)
 CHUNKING_STRATEGY=structural
+# `qdrant` (Live search) | `parquet` (Offline static file sink)
+STORAGE_TYPE=qdrant
 ```
 
-### 4. Verify Business Value (Demo)
-Inspect the structured output that was generated. This proves the data is now ready for consumption by Vector DBs or LLMs.
+Note: If running in a strictly isolated or offline environment, switch `EMBEDDING_TYPE='mock'` and `STORAGE_TYPE='parquet'`. These eliminate external HTTP HuggingFace model fetching and database networking requirements.
+
+### 7. Run Automated Tests
 ```bash
-make demo
+make test
 ```
 
 ---
@@ -108,21 +110,26 @@ make demo
 ## 📂 Project Structure
 
 ```
-├── Data/                   # Raw input documents (The "Source")
-├── output/                 # Processed Parquet files (The "Asset")
+├── Data/                   # Raw input documents
+├── output/                 # Processed Parquet files
 ├── src/
-│   ├── config/            # Configuration management
-│   ├── ingestion/         # PDF loading & metadata extraction
-│   ├── processing/        # Text splitting logic
-│   ├── embedding/         # Vector generation interface
-│   ├── storage/           # Data persistence layer
+│   ├── config/            # Env and centralized settings
+│   ├── ingestion/         # PDF & Image OCR loading
+│   ├── processing/        # Intelligent chunking strategies
+│   ├── embedding/         # Vector generation (Dense, Mock, Hybrid)
+│   ├── storage/           # Data contracts (GE) and persistence (Qdrant/Parquet)
+│   ├── api/               # FastAPI retrieval service
+│   ├── ui/                # Streamlit chat interface
+│   ├── streaming/         # Real-time Redpanda Event consumers
 │   └── demo/              # Demonstration scripts
-├── main.py                # Pipeline Orchestrator
-├── Makefile               # Command runner
+├── terraform/             # Zero-cost local Infrastructure as Code (IaaC)
+├── main.py                # Batch Pipeline Orchestrator
+├── Makefile               # Task runner
 └── requirements.txt       # Dependencies
 ```
 
-## Future Improvements
-- [ ] Connect to Weaviate/Pinecone for Vector DB storage.
-- [ ] Implement Airflow DAGs for scheduled ingestion.
-- [ ] Add Docker containerization for deployment.
+## Future Improvements (P1/P2/P3 Roadmap)
+- [ ] Implement robust CI Pipeline (Ruff Linting, Mypy, test gates).
+- [ ] Migrate storage to batched upserts with exponential backoff & dead-letter queue semantics for Kafka.
+- [ ] Reranking architecture & retrieval quality eval program (MRR/nDCG).
+- [ ] Multi-tenant API security (RBAC/API Keys) & rate-limiting bounds.

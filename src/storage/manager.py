@@ -15,6 +15,9 @@ class BaseStorageManager(ABC):
         pass
 
     def validate_data_quality(self, chunks: List[ProcessedChunk], embeddings: List[Any]):
+        if len(chunks) != len(embeddings):
+            raise ValueError(f"Mismatch: {len(chunks)} chunks vs {len(embeddings)} embeddings")
+
         import great_expectations as gx
         
         logger.info("Running Great Expectations Data Quality Checks...")
@@ -49,10 +52,12 @@ class BaseStorageManager(ABC):
         suite.add_expectation(
             gx.expectations.ExpectColumnValuesToNotBeNull(column="text")
         )
-        # 2. Vector must be length 768
+        # 2. Vector must be length matches settings
         suite.add_expectation(
             gx.expectations.ExpectColumnValuesToBeBetween(
-                column="vector_len", min_value=768, max_value=768
+                column="vector_len", 
+                min_value=settings.EMBEDDING_DIMENSION, 
+                max_value=settings.EMBEDDING_DIMENSION
             )
         )
         # 3. ID format

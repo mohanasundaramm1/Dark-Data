@@ -14,9 +14,9 @@ from src.processing.enricher import SummaryEnricher
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("RedpandaConsumer")
 
-KAFKA_BROKER = "localhost:39092"
-TOPIC_NAME = "raw_documents"
-GROUP_ID = "rag_pipeline_group"
+KAFKA_BROKER = settings.KAFKA_BROKER
+TOPIC_NAME = settings.KAFKA_TOPIC_NAME
+GROUP_ID = settings.KAFKA_GROUP_ID
 
 def process_single_file(file_path: str, use_hyde: bool = False):
     logger.info(f"Starting pipeline for single file: {file_path}")

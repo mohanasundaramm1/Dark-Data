@@ -25,3 +25,4 @@ kafka-python-ng
 watchdog
 transformers
 torch
+pytest

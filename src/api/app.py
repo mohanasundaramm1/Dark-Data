@@ -7,15 +7,36 @@ from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up FastAPI application...")
+    # Initialize connection to Qdrant
+    if settings.STORAGE_TYPE == "qdrant":
+        from qdrant_client import QdrantClient
+        app.state.qdrant_client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT, timeout=10)
+    else:
+        logger.warning("STORAGE_TYPE is not qdrant. Live search is disabled.")
+    
+    # Initialize embedder once
+    logger.info(f"Initializing Embedder: {settings.EMBEDDING_TYPE}")
+    app.state.embedder = get_embedder(settings.EMBEDDING_TYPE)
+    yield
+    # We could close clients here if needed
+
 app = FastAPI(
     title="Dark Data Retrieval API",
     description="API for semantic search over ingested unstructured data.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
+from pydantic import BaseModel, Field
+
 class QueryRequest(BaseModel):
-    query: str
-    top_k: int = 3
+    query: str = Field(..., min_length=1, max_length=1000)
+    top_k: int = Field(default=3, ge=1, le=100)
 
 class SearchResult(BaseModel):
     chunk_id: str
@@ -23,15 +44,7 @@ class SearchResult(BaseModel):
     score: float
     metadata: dict
 
-@app.on_event("startup")
-def startup_event():
-    logger.info("Starting up FastAPI application...")
-    # Initialize connection to Qdrant
-    if settings.STORAGE_TYPE == "qdrant":
-        from qdrant_client import QdrantClient
-        app.state.qdrant_client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
-    else:
-        logger.warning("STORAGE_TYPE is not qdrant. Live search is disabled.")
+
 
 @app.post("/search", response_model=List[SearchResult])
 def search(request: QueryRequest):
@@ -40,7 +53,7 @@ def search(request: QueryRequest):
         
     try:
         # 1. Embed the query
-        embedder = get_embedder(settings.EMBEDDING_TYPE)
+        embedder = app.state.embedder
         # Assuming embed_documents returns a list of vectors, we grab the first one
         query_vector = embedder.embed_documents([request.query])[0]
         

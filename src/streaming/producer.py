@@ -12,8 +12,8 @@ from src.config.settings import settings
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("RedpandaProducer")
 
-KAFKA_BROKER = "localhost:39092"
-TOPIC_NAME = "raw_documents"
+KAFKA_BROKER = settings.KAFKA_BROKER
+TOPIC_NAME = settings.KAFKA_TOPIC_NAME
 
 # Initialize Kafka Producer
 producer = KafkaProducer(

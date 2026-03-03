@@ -12,7 +12,7 @@ demo:
 	rag_pipeline_env/bin/python src/demo/inspect_data.py
 
 api:
-	rag_pipeline_env/bin/uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8888
+	rag_pipeline_env/bin/uvicorn src.api.app:app --reload --host 0.0.0.0 --port $${API_PORT:-8888}
 
 ui:
 	rag_pipeline_env/bin/streamlit run src/ui/app.py
@@ -35,4 +35,4 @@ distclean: clean
 	rm -rf rag_pipeline_env
 
 test:
-	rag_pipeline_env/bin/pytest tests/
+	PYTHONPATH=. rag_pipeline_env/bin/pytest tests/

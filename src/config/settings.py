@@ -32,4 +32,14 @@ class Settings:
     QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "dark_data")
 
+    # Kafka Config
+    KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:39092")
+    KAFKA_TOPIC_NAME = os.getenv("KAFKA_TOPIC_NAME", "raw_documents")
+    KAFKA_GROUP_ID = os.getenv("KAFKA_GROUP_ID", "rag_pipeline_group")
+
+    # API Config
+    API_HOST = os.getenv("API_HOST", "0.0.0.0")
+    API_PORT = int(os.getenv("API_PORT", 8888))
+    API_URL = os.getenv("API_URL", f"http://localhost:{API_PORT}")
+
 settings = Settings()

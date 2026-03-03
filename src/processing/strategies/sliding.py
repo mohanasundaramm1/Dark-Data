@@ -13,6 +13,13 @@ class SlidingWindowStrategy(ChunkingStrategy):
     def __init__(self, window_size: int = 100, step_size: int = 50):
         # window_size: Number of words per chunk
         # step_size: How many words to move forward (overlap = window_size - step_size)
+        if window_size <= 0:
+            raise ValueError("window_size must be greater than 0")
+        if step_size <= 0:
+            raise ValueError("step_size must be greater than 0")
+        if step_size > window_size:
+            logger.warning("step_size is greater than window_size. This will cause gaps between chunks.")
+        
         self.window_size = window_size
         self.step_size = step_size
 
