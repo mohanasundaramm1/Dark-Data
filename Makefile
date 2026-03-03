@@ -14,6 +14,9 @@ demo:
 api:
 	rag_pipeline_env/bin/uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8888
 
+ui:
+	rag_pipeline_env/bin/streamlit run src/ui/app.py
+
 infra-up:
 	docker-compose up -d
 

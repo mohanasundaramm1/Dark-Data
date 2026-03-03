@@ -75,6 +75,12 @@ make api
 ```
 Then visit `http://localhost:8888/docs` to test semantic search.
 
+### 5. Chat with the Data (Streamlit UI)
+Once the API is running, you can open a beautiful Chat interface that talks to your Data Lake:
+```bash
+make ui
+```
+
 
 ### 3. Configuration (Optional)
 This pipeline supports both **Local** (Real) and **Mock** (Fast/Test) embedding modes.

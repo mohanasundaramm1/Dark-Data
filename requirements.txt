@@ -14,3 +14,5 @@ qdrant-client>=1.7.0
 apache-airflow>=2.10.0
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
+streamlit>=1.30.0
+requests>=2.31.0

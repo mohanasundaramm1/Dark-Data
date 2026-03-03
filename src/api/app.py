@@ -46,15 +46,15 @@ def search(request: QueryRequest):
         
         # 2. Search Qdrant
         client = app.state.qdrant_client
-        search_result = client.search(
+        search_result = client.query_points(
             collection_name=settings.QDRANT_COLLECTION_NAME,
-            query_vector=query_vector,
+            query=query_vector,
             limit=request.top_k
         )
         
         # 3. Format results
         results = []
-        for scored_point in search_result:
+        for scored_point in search_result.points:
             results.append(SearchResult(
                 chunk_id=str(scored_point.id),
                 text=scored_point.payload.get("text", ""),
