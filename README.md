@@ -41,28 +41,39 @@ graph LR
 - **Language**: Python 3.10+
 - **Data Validation**: Pydantic
 - **Processing**: LangChain / Pandas 2.0
-- **Storage**: Apache Parquet / PyArrow
-- **Infrastructure**: Make / VirtualEnv
+- **Storage**: Qdrant Vector DB (Serving Layer) & Apache Parquet (Data Lake)
+- **Orchestration**: Apache Airflow
+- **API/Serving**: FastAPI
+- **Infrastructure**: Docker / Make / VirtualEnv
 
 ---
 
 ## 🚀 How to Run
 
-### 1. Setup
+### 1. Setup Infrastructure
+Start the Qdrant Vector DB via Docker:
+```bash
+make infra-up
+```
+
+### 2. Setup Environment
 Initialize the isolated environment and dependencies.
 ```bash
 make setup
 ```
 
-### 2. Ingest Data (ETL Run)
-Run the full ingestion pipeline. This process will:
-1. Scan `Data/` for new documents.
-2. Chunk them into 1000-character segments.
-3. Generate 768-dimensional vector embeddings.
-4. Save the result to `output/embeddings.parquet`.
+### 3. Ingest Data (ETL Run)
+Run the full ingestion pipeline to process PDFs and upsert vectors into Qdrant.
 ```bash
 make run
 ```
+
+### 4. Serve the Data (API)
+Start the FastAPI server to query the pipeline results:
+```bash
+make api
+```
+Then visit `http://localhost:8000/docs` to test semantic search.
 
 
 ### 3. Configuration (Optional)

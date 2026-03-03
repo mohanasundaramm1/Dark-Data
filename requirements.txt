@@ -10,3 +10,7 @@ pandas>=2.0.0
 pydantic>=2.0.0
 pyarrow>=14.0.0
 sentence-transformers>=2.2.2
+qdrant-client>=1.7.0
+apache-airflow>=2.10.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0

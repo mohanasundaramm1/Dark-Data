@@ -20,7 +20,16 @@ class Settings:
     # Options: "fixed", "sliding", "structural"
     CHUNKING_STRATEGY = os.getenv("CHUNKING_STRATEGY", "structural")
 
-    # Path where processed parquet files (silver layer) will be saved
+    # Storage Configuration
+    # Options: "parquet", "qdrant"
+    STORAGE_TYPE = os.getenv("STORAGE_TYPE", "qdrant")
+    
+    # Path where processed parquet files (silver layer) will be saved (used if STORAGE_TYPE='parquet')
     OUTPUT_PATH = os.path.join("output", "embeddings.parquet")
+
+    # Qdrant Config
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+    QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
+    QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "dark_data")
 
 settings = Settings()

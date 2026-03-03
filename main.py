@@ -7,7 +7,7 @@ from src.config.settings import settings
 from src.ingestion.loader import PDFLoader
 from src.processing.factory import StrategyFactory
 from src.embedding.embedder import get_embedder
-from src.storage.manager import VectorStorageManager
+from src.storage.manager import get_storage_manager
 
 # Configure Logging
 logging.basicConfig(
@@ -50,7 +50,7 @@ def run_pipeline():
     
     # 4. Storage
     logger.info("Phase 4: Storage")
-    storage = VectorStorageManager()
+    storage = get_storage_manager(settings.STORAGE_TYPE)
     storage.save_embeddings(chunks, embeddings)
     
     duration = time.time() - start_time
