@@ -34,10 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application source
+# Copy application source — never copy .env (secrets must be injected at runtime)
 COPY src/ ./src/
 COPY main.py .
-COPY .env .
 
 # Non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser

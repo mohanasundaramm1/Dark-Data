@@ -10,6 +10,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from typing import List
 import logging
 import os
+from starlette.responses import Response
 from src.embedding.embedder import get_embedder
 from src.config.settings import settings
 
@@ -77,7 +78,15 @@ app.add_middleware(
 
 # Rate Limiting
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def rate_limit_exception_handler(request: Request, exc: Exception) -> Response:
+    if isinstance(exc, RateLimitExceeded):
+        return _rate_limit_exceeded_handler(request, exc)
+    return Response(status_code=500)
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
 
 # Prometheus Metrics  (auto-exposes /metrics endpoint)
 Instrumentator().instrument(app).expose(app)
