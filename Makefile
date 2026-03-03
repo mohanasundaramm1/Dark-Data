@@ -23,10 +23,22 @@ streaming-consumer:
 	PYTHONPATH=. rag_pipeline_env/bin/python src/streaming/consumer.py --hyde
 
 infra-up:
-	docker-compose up -d
+	docker-compose up -d qdrant
+
+infra-dev:
+	docker-compose --profile dev up -d
+
+infra-prod:
+	docker-compose --profile prod up -d
 
 infra-down:
 	docker-compose down
+
+docker-build:
+	docker build -t dark-data-api:latest .
+
+tf-plan:
+	cd terraform && terraform init && terraform plan
 
 eval:
 	PYTHONPATH=. rag_pipeline_env/bin/python src/evaluation/retrieval_eval.py

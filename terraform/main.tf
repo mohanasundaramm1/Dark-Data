@@ -1,101 +1,327 @@
+# =============================================================================
+# Cloud-Native AWS Terraform  —  Dark Data RAG Platform
+# 
+# COST: ~$0 to write and plan. Only incurs cost when you run `terraform apply`
+#       against a real AWS account.
+#
+# Architecture:
+#   ECS Fargate (API)  →  ECR (container registry)  →  VPC (networking)
+#   MSK Serverless     (Kafka streaming)
+#   Open Search        (optional, not provisioned here — Qdrant via ECS instead)
+# =============================================================================
+
 terraform {
+  required_version = ">= 1.5"
   required_providers {
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.0.1"
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
+
+  # Remote state backend (S3 + DynamoDB lock)
+  # Uncomment once you have AWS credentials:
+  # backend "s3" {
+  #   bucket         = "dark-data-tfstate"
+  #   key            = "platform/terraform.tfstate"
+  #   region         = var.aws_region
+  #   dynamodb_table = "dark-data-tfstate-lock"
+  #   encrypt        = true
+  # }
 }
 
-provider "docker" {
-  host = "unix:///var/run/docker.sock"
+provider "aws" {
+  region = var.aws_region
 }
 
-# ----------------------------------------------------
-# 1. Image Data Sources (To Pull Images if needed)
-# ----------------------------------------------------
+# =============================================================================
+# Variables
+# =============================================================================
 
-resource "docker_image" "qdrant" {
-  name         = "qdrant/qdrant:latest"
-  keep_locally = true
+variable "aws_region" {
+  description = "AWS region to deploy into"
+  type        = string
+  default     = "us-east-1"
 }
 
-resource "docker_image" "redpanda" {
-  name         = "docker.redpanda.com/redpandadata/redpanda:latest"
-  keep_locally = true
+variable "app_name" {
+  description = "Base name for all resources"
+  type        = string
+  default     = "dark-data"
 }
 
-# ----------------------------------------------------
-# 2. Volumes
-# ----------------------------------------------------
-
-resource "docker_volume" "qdrant_storage" {
-  name = "terraform_qdrant_storage"
+variable "environment" {
+  description = "Deployment environment: dev | staging | prod"
+  type        = string
+  default     = "prod"
 }
 
-# ----------------------------------------------------
-# 3. Qdrant Vector DB Container
-# ----------------------------------------------------
-
-resource "docker_container" "qdrant" {
-  name  = "qdrant_terraform"
-  image = docker_image.qdrant.image_id
-
-  ports {
-    internal = 6333
-    external = 6333
-  }
-  ports {
-    internal = 6334
-    external = 6334
-  }
-
-  volumes {
-    volume_name    = docker_volume.qdrant_storage.name
-    container_path = "/qdrant/storage"
-  }
-
-  restart = "unless-stopped"
+variable "api_image_tag" {
+  description = "Docker image tag to deploy"
+  type        = string
+  default     = "latest"
 }
 
-# ----------------------------------------------------
-# 4. Redpanda Streaming Platform (Kafka Compatible)
-# ----------------------------------------------------
+variable "api_key" {
+  description = "API key for the search service"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
 
-resource "docker_container" "redpanda" {
-  name  = "redpanda_terraform"
-  image = docker_image.redpanda.image_id
+# =============================================================================
+# ECR — Container Registry
+# =============================================================================
 
-  command = [
-    "redpanda", "start", "--smp", "1",
-    "--reserve-memory", "0M", "--overprovisioned",
-    "--node-id", "0",
-    "--kafka-addr", "PLAINTEXT://0.0.0.0:49092,OUTSIDE://0.0.0.0:39092",
-    "--advertise-kafka-addr", "PLAINTEXT://redpanda_terraform:49092,OUTSIDE://localhost:39092",
-    "--pandaproxy-addr", "PLAINTEXT://0.0.0.0:48082,OUTSIDE://0.0.0.0:38082",
-    "--advertise-pandaproxy-addr", "PLAINTEXT://redpanda_terraform:48082,OUTSIDE://localhost:38082"
-  ]
+resource "aws_ecr_repository" "api" {
+  name                 = "${var.app_name}-api"
+  image_tag_mutability = "MUTABLE"
 
-  ports {
-    internal = 8081
-    external = 8088
+  image_scanning_configuration {
+    scan_on_push = true
   }
-  ports {
-    internal = 8082
-    external = 8089
-  }
-  ports {
-    internal = 39092
-    external = 39092
-  }
-  ports {
-    internal = 38082
-    external = 38082
-  }
-  ports {
-    internal = 49092
-    external = 49092
+}
+
+output "ecr_repository_url" {
+  description = "Push your Docker image here"
+  value       = aws_ecr_repository.api.repository_url
+}
+
+# =============================================================================
+# VPC & Networking  (simple 2-AZ setup)
+# =============================================================================
+
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = { Name = "${var.app_name}-vpc" }
+}
+
+resource "aws_subnet" "public_a" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "${var.aws_region}a"
+  map_public_ip_on_launch = true
+  tags                    = { Name = "${var.app_name}-public-a" }
+}
+
+resource "aws_subnet" "public_b" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "${var.aws_region}b"
+  map_public_ip_on_launch = true
+  tags                    = { Name = "${var.app_name}-public-b" }
+}
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "${var.app_name}-igw" }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
   }
 
-  restart = "unless-stopped"
+  tags = { Name = "${var.app_name}-public-rt" }
+}
+
+resource "aws_route_table_association" "a" {
+  subnet_id      = aws_subnet.public_a.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "b" {
+  subnet_id      = aws_subnet.public_b.id
+  route_table_id = aws_route_table.public.id
+}
+
+# =============================================================================
+# Security Groups
+# =============================================================================
+
+resource "aws_security_group" "alb" {
+  name   = "${var.app_name}-alb-sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "ecs_tasks" {
+  name   = "${var.app_name}-ecs-sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port       = 8888
+    to_port         = 8888
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# =============================================================================
+# Application Load Balancer
+# =============================================================================
+
+resource "aws_lb" "api" {
+  name               = "${var.app_name}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+}
+
+resource "aws_lb_target_group" "api" {
+  name        = "${var.app_name}-tg"
+  port        = 8888
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    interval            = 30
+    timeout             = 10
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+}
+
+resource "aws_lb_listener" "api_http" {
+  load_balancer_arn = aws_lb.api.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+}
+
+output "api_url" {
+  description = "Public URL for the RAG API"
+  value       = "http://${aws_lb.api.dns_name}"
+}
+
+# =============================================================================
+# ECS Cluster + Fargate Service (API)
+# =============================================================================
+
+resource "aws_ecs_cluster" "main" {
+  name = "${var.app_name}-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+}
+
+resource "aws_iam_role" "ecs_task_execution" {
+  name = "${var.app_name}-ecs-exec-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_execution" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_cloudwatch_log_group" "api" {
+  name              = "/ecs/${var.app_name}-api"
+  retention_in_days = 14
+}
+
+resource "aws_ecs_task_definition" "api" {
+  family                   = "${var.app_name}-api"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "512"
+  memory                   = "1024"
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "api"
+      image     = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
+      essential = true
+      portMappings = [
+        { containerPort = 8888, hostPort = 8888, protocol = "tcp" }
+      ]
+      environment = [
+        { name = "STORAGE_TYPE", value = "qdrant" },
+        { name = "EMBEDDING_TYPE", value = "hybrid" },
+        { name = "QDRANT_HOST", value = "qdrant" },
+        { name = "API_KEY", value = var.api_key },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.api.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+}
+
+resource "aws_ecs_service" "api" {
+  name            = "${var.app_name}-api"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.api.arn
+  desired_count   = 2
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.api.arn
+    container_name   = "api"
+    container_port   = 8888
+  }
+
+  depends_on = [aws_lb_listener.api_http]
 }
