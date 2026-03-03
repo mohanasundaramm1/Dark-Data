@@ -1,7 +1,5 @@
 import streamlit as st
 import requests
-import json
-import logging
 
 try:
     from langchain_community.llms import Ollama
@@ -51,7 +49,7 @@ if prompt:
                 api_response = requests.post(PIPELINE_API_URL, json={"query": prompt, "top_k": 3})
                 api_response.raise_for_status()
                 chunks = api_response.json()
-            except Exception as e:
+            except Exception:
                 st.error(f"❌ Failed to reach the Semantic Search API at {PIPELINE_API_URL}. Is `make api` running?")
                 st.stop()
                 

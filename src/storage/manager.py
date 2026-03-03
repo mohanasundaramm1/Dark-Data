@@ -3,6 +3,7 @@ from typing import List, Any
 import pandas as pd
 import os
 import logging
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 from src.ingestion.models import ProcessedChunk
 from src.config.settings import settings
 
@@ -23,8 +24,10 @@ class BaseStorageManager(ABC):
         logger.info("Running Great Expectations Data Quality Checks...")
         
         data = []
+        from typing import Dict, Any
+
         for chunk, vector_data in zip(chunks, embeddings):
-            row = {
+            row: Dict[str, Any] = {
                 "chunk_id": chunk.chunk_id,
                 "parent_id": chunk.parent_doc_id,
                 "text": chunk.content,
@@ -60,9 +63,16 @@ class BaseStorageManager(ABC):
                 max_value=settings.EMBEDDING_DIMENSION
             )
         )
-        # 3. ID format
+        # 3. ID format (Valid UUIDv4)
         suite.add_expectation(
-            gx.expectations.ExpectColumnValuesToNotBeNull(column="chunk_id")
+            gx.expectations.ExpectColumnValuesToMatchRegex(
+                column="chunk_id",
+                regex=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            )
+        )
+        # 4. ID uniqueness
+        suite.add_expectation(
+            gx.expectations.ExpectColumnValuesToBeUnique(column="chunk_id")
         )
 
         validation_result = context.validation_definitions.add(
@@ -175,6 +185,7 @@ class QdrantStorageManager(BaseStorageManager):
                 id=chunk.chunk_id,
                 vector=vector,
                 payload={
+                    "schema_version": 1,
                     "parent_id": chunk.parent_doc_id,
                     "text": chunk.content,
                     **chunk.metadata
@@ -182,6 +193,15 @@ class QdrantStorageManager(BaseStorageManager):
             )
             points.append(point)
             
+        self._upsert_with_retry(points)
+
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception_type(Exception),
+        reraise=True
+    )
+    def _upsert_with_retry(self, points):
         try:
             self.client.upsert(
                 collection_name=settings.QDRANT_COLLECTION_NAME,
@@ -189,7 +209,7 @@ class QdrantStorageManager(BaseStorageManager):
             )
             logger.info(f"Successfully upserted {len(points)} vectors to Qdrant collection '{settings.QDRANT_COLLECTION_NAME}'.")
         except Exception as e:
-            logger.error(f"Failed to upsert vectors to Qdrant: {e}")
+            logger.warning(f"Qdrant upsert failed, retrying... Error: {e}")
             raise
 
 

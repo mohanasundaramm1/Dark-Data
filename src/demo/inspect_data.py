@@ -24,8 +24,8 @@ def inspect_output():
         total_chunks = len(df)
         unique_docs = df['parent_id'].nunique()
         
-        print(f"✅ SUCCESSFULLY LOADED PARQUET FILE")
-        print(f"📊 STATISTICS:")
+        print("✅ SUCCESSFULLY LOADED PARQUET FILE")
+        print("📊 STATISTICS:")
         print(f"   • Total Processed Chunks:  {total_chunks}")
         print(f"   • Unique Input Documents:  {unique_docs}")
         if not df.empty:

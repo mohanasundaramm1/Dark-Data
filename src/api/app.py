@@ -1,13 +1,12 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from contextlib import asynccontextmanager
 from typing import List
 import logging
 from src.embedding.embedder import get_embedder
 from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,8 +30,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
-
-from pydantic import BaseModel, Field
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
