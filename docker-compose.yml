@@ -11,5 +11,33 @@ services:
       - qdrant_storage:/qdrant/storage
     restart: unless-stopped
 
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: redpanda_local
+    command:
+      - redpanda
+      - start
+      - --smp
+      - '1'
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --node-id
+      - '0'
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:49092,OUTSIDE://0.0.0.0:39092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:49092,OUTSIDE://localhost:39092
+      - --pandaproxy-addr
+      - PLAINTEXT://0.0.0.0:48082,OUTSIDE://0.0.0.0:38082
+      - --advertise-pandaproxy-addr
+      - PLAINTEXT://redpanda:48082,OUTSIDE://localhost:38082
+    ports:
+      - "8088:8081"
+      - "8089:8082"
+      - "39092:39092"
+      - "38082:38082"
+      - "49092:49092"
+
 volumes:
   qdrant_storage:

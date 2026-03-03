@@ -21,3 +21,7 @@ fastembed
 pytesseract
 pdf2image
 great_expectations>=0.18.0
+kafka-python-ng
+watchdog
+transformers
+torch

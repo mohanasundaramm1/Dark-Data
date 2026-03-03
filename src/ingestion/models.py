@@ -16,5 +16,6 @@ class ProcessedChunk(BaseModel):
     chunk_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     parent_doc_id: str
     content: str
+    summary: Optional[str] = None
     chunk_index: int
     metadata: Dict[str, Any] = Field(default_factory=dict)

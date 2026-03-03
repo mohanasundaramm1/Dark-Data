@@ -16,6 +16,11 @@ api:
 
 ui:
 	rag_pipeline_env/bin/streamlit run src/ui/app.py
+streaming-producer:
+	PYTHONPATH=. rag_pipeline_env/bin/python src/streaming/producer.py
+
+streaming-consumer:
+	PYTHONPATH=. rag_pipeline_env/bin/python src/streaming/consumer.py --hyde
 
 infra-up:
 	docker-compose up -d
