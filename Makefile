@@ -12,7 +12,7 @@ demo:
 	rag_pipeline_env/bin/python src/demo/inspect_data.py
 
 api:
-	rag_pipeline_env/bin/uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+	rag_pipeline_env/bin/uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8888
 
 infra-up:
 	docker-compose up -d

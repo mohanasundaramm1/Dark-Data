@@ -73,7 +73,7 @@ Start the FastAPI server to query the pipeline results:
 ```bash
 make api
 ```
-Then visit `http://localhost:8000/docs` to test semantic search.
+Then visit `http://localhost:8888/docs` to test semantic search.
 
 
 ### 3. Configuration (Optional)
