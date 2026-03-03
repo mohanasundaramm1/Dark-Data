@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Any
 import pandas as pd
 import os
 import logging
@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 class BaseStorageManager(ABC):
     @abstractmethod
-    def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[List[float]]):
+    def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[Any]):
         """Saves chunks and embeddings to the underlying storage system."""
         pass
 
 class ParquetStorageManager(BaseStorageManager):
     """Saves vectorized chunks to a Parquet file (Data Lake / Silver Layer)."""
-    def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[List[float]]):
+    def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[Any]):
         if not chunks:
             logger.warning("No chunks to save.")
             return
@@ -52,7 +52,7 @@ class QdrantStorageManager(BaseStorageManager):
     def __init__(self):
         try:
             from qdrant_client import QdrantClient
-            from qdrant_client.models import VectorParams, Distance
+            from qdrant_client.models import VectorParams, Distance, SparseVectorParams
             
             logger.info(f"Connecting to Qdrant at {settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
             self.client = QdrantClient(host=settings.QDRANT_HOST, port=settings.QDRANT_PORT)
@@ -63,10 +63,13 @@ class QdrantStorageManager(BaseStorageManager):
             
             if settings.QDRANT_COLLECTION_NAME not in collection_names:
                 logger.info(f"Creating new Qdrant collection: '{settings.QDRANT_COLLECTION_NAME}'")
-                self.client.create_collection(
-                    collection_name=settings.QDRANT_COLLECTION_NAME,
-                    vectors_config=VectorParams(size=settings.EMBEDDING_DIMENSION, distance=Distance.COSINE),
-                )
+                kwargs = {
+                    "collection_name": settings.QDRANT_COLLECTION_NAME,
+                    "vectors_config": VectorParams(size=settings.EMBEDDING_DIMENSION, distance=Distance.COSINE),
+                }
+                if settings.EMBEDDING_TYPE == "hybrid":
+                    kwargs["sparse_vectors_config"] = {"text-sparse": SparseVectorParams()}
+                self.client.create_collection(**kwargs)
             else:
                 logger.info(f"Using existing Qdrant collection: '{settings.QDRANT_COLLECTION_NAME}'")
                 
@@ -77,17 +80,29 @@ class QdrantStorageManager(BaseStorageManager):
             logger.error(f"Failed to connect to Qdrant: {e}")
             raise
 
-    def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[List[float]]):
+    def save_embeddings(self, chunks: List[ProcessedChunk], embeddings: List[Any]):
         if not chunks:
             logger.warning("No chunks to save.")
             return
 
-        from qdrant_client.models import PointStruct
+        from qdrant_client.models import PointStruct, SparseVector
 
         logger.info(f"Preparing to save {len(chunks)} vectors to Qdrant Vector DB.")
         
         points = []
-        for chunk, vector in zip(chunks, embeddings):
+        for chunk, vector_data in zip(chunks, embeddings):
+            if isinstance(vector_data, dict) and "sparse_indices" in vector_data:
+                # Hybrid format
+                vector = {
+                    "": vector_data["dense"],
+                    "text-sparse": SparseVector(
+                        indices=vector_data["sparse_indices"],
+                        values=vector_data["sparse_values"]
+                    )
+                }
+            else:
+                vector = vector_data # List of floats
+                
             point = PointStruct(
                 id=chunk.chunk_id,
                 vector=vector,

@@ -46,11 +46,34 @@ def search(request: QueryRequest):
         
         # 2. Search Qdrant
         client = app.state.qdrant_client
-        search_result = client.query_points(
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            query=query_vector,
-            limit=request.top_k
-        )
+        if isinstance(query_vector, dict) and "sparse_indices" in query_vector:
+            from qdrant_client import models
+            search_result = client.query_points(
+                collection_name=settings.QDRANT_COLLECTION_NAME,
+                prefetch=[
+                    models.Prefetch(
+                        query=query_vector["dense"],
+                        using="",
+                        limit=request.top_k
+                    ),
+                    models.Prefetch(
+                        query=models.SparseVector(
+                            indices=query_vector["sparse_indices"],
+                            values=query_vector["sparse_values"]
+                        ),
+                        using="text-sparse",
+                        limit=request.top_k
+                    )
+                ],
+                query=models.FusionQuery(fusion=models.Fusion.RRF),
+                limit=request.top_k
+            )
+        else:
+            search_result = client.query_points(
+                collection_name=settings.QDRANT_COLLECTION_NAME,
+                query=query_vector,
+                limit=request.top_k
+            )
         
         # 3. Format results
         results = []

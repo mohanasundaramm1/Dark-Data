@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Any
 import numpy as np
 import logging
 from src.config.settings import settings
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class BaseEmbedder(ABC):
     @abstractmethod
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: List[str]) -> List[Any]:
         pass
 
 class MockEmbedder(BaseEmbedder):
@@ -20,7 +20,7 @@ class MockEmbedder(BaseEmbedder):
         self.dimension = dimension
         logger.warning(f"Initialized MockEmbedder. This will generate RANDOM vectors of dimension {dimension}.")
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: List[str]) -> List[Any]:
         logger.info(f"Generating vectors for {len(texts)} chunks using MockEmbedder.")
         embeddings = []
         for text in texts:
@@ -46,16 +46,55 @@ class HuggingFaceEmbedder(BaseEmbedder):
             logger.error("sentence-transformers not installed. Please run: pip install sentence-transformers")
             raise
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: List[str]) -> List[Any]:
         logger.info(f"Generating semantic vectors for {len(texts)} chunks using HuggingFace.")
         # encode returns numpy array, convert to list
         embeddings = self.model.encode(texts, show_progress_bar=True)
         return embeddings.tolist()
+
+class HybridEmbedder(BaseEmbedder):
+    """
+    A unified embedder that generates both dense (sentence-transformers) 
+    and sparse (BM25 via fastembed) embeddings for Hybrid Search.
+    """
+    def __init__(self, dense_model_name: str = settings.EMBEDDING_MODEL_NAME):
+        try:
+            from sentence_transformers import SentenceTransformer
+            from fastembed import SparseTextEmbedding
+            
+            logger.info(f"Loading local Dense model: {dense_model_name}...")
+            self.dense_model = SentenceTransformer(dense_model_name)
+            
+            logger.info("Loading local Sparse model (BM25)...")
+            self.sparse_model = SparseTextEmbedding("Qdrant/bm25")
+            logger.info("Hybrid models loaded successfully.")
+        except ImportError:
+            logger.error("Dependencies missing. Run: pip install sentence-transformers fastembed")
+            raise
+
+    def embed_documents(self, texts: List[str]) -> List[Any]:
+        logger.info(f"Generating dense and sparse vectors for {len(texts)} chunks.")
+        # Dense
+        dense_embeddings = self.dense_model.encode(texts, show_progress_bar=True).tolist()
+        
+        # Sparse
+        sparse_embeddings = list(self.sparse_model.embed(texts)) # Returns list of SparseEmbedding
+        
+        results = []
+        for d, s in zip(dense_embeddings, sparse_embeddings):
+            results.append({
+                "dense": d,
+                "sparse_indices": s.indices.tolist(),
+                "sparse_values": s.values.tolist()
+            })
+        return results
 
 def get_embedder(type: str = settings.EMBEDDING_TYPE) -> BaseEmbedder:
     if type == "mock":
         return MockEmbedder()
     elif type == "huggingface":
         return HuggingFaceEmbedder()
+    elif type == "hybrid":
+        return HybridEmbedder()
     else:
         raise ValueError(f"Unknown embedder type: {type}")

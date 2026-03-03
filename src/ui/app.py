@@ -59,36 +59,17 @@ if prompt:
             message_placeholder.markdown("No relevant information found in the ingested documents.")
             st.stop()
 
-        # Step B: Synthesize Answer via Local LLM (Ollama)
-        with st.spinner(f"Synthesizing answer using {MODEL_NAME}..."):
-            context = "\n\n---\n\n".join([f"Source: {c['metadata'].get('source')}\nContent: {c['text']}" for c in chunks])
+        # Step B: Present Results
+        with st.spinner("Extracting insights..."):
+            message_placeholder.markdown("Here is the relevant information I found in our ingested Data Lake:")
             
-            system_prompt = f"""
-            You are an expert Data Analyst and AI Assistant. Answer the user's question based strictly on the provided context excerpts from our internal dataset.
-            If the context doesn't contain the answer, say "I cannot answer this based on the provided documents."
-            Do not make up external information.
-            
-            CONTEXT EXTRACTED FROM QDRANT DATABASE:
-            {context}
-            
-            USER QUESTION: {prompt}
-            """
-            
-            try:
-                if Ollama is None:
-                    raise ImportError("Ollama integration missing.")
-                
-                llm = Ollama(model=MODEL_NAME)
-                response = llm.invoke(system_prompt)
-                message_placeholder.markdown(response)
-                
-                # Render sources
-                with st.expander("View Source Chunks from Qdrant"):
-                    for i, chunk in enumerate(chunks):
-                        st.markdown(f"**Document**: `{chunk['metadata'].get('source', 'Unknown')}` (Sim Score: {chunk['score']:.3f})")
-                        st.info(chunk["text"])
-                        
-                st.session_state.messages.append({"role": "assistant", "content": response, "sources": chunks})
-
-            except Exception as e:
-                message_placeholder.error(f"❌ Failed to communicate with local Ollama model. Is Ollama running? Run `ollama run {MODEL_NAME}` in your terminal. Error: {e}")
+            # Render sources
+            for i, chunk in enumerate(chunks):
+                st.markdown(f"**Result {i+1}**: `{chunk['metadata'].get('source', 'Unknown')}` (Sim Score: {chunk['score']:.3f})")
+                st.info(chunk["text"])
+                    
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": "Here is the relevant information I found in our ingested Data Lake:", 
+                "sources": chunks
+            })
